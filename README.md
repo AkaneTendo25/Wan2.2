@@ -216,6 +216,59 @@ DASH_API_KEY=your_key torchrun --nproc_per_node=8 generate.py --task i2v-A14B --
 
 > The process of prompt extension can be referenced [here](#2-using-prompt-extention).
 
+#### Using LoRA with Image-to-Video Generation
+
+Wan2.2-I2V-A14B supports LoRA (Low-Rank Adaptation) for fine-tuning video generation. The model uses a Mixture-of-Experts architecture with separate high-noise and low-noise expert models, allowing you to apply LoRAs to both or individually.
+
+##### Basic LoRA Usage (Applied to Both Experts)
+
+```sh
+python generate.py --task i2v-A14B --size 1280*720 --ckpt_dir ./Wan2.2-I2V-A14B \
+  --image examples/i2v_input.JPG \
+  --prompt "Cinematic style with dramatic lighting" \
+  --lora_path ./loras/style.safetensors \
+  --lora_scale 1.0 \
+  --offload_model True --convert_model_dtype
+```
+
+##### Multiple LoRAs with Custom Scaling
+
+```sh
+python generate.py --task i2v-A14B --size 1280*720 --ckpt_dir ./Wan2.2-I2V-A14B \
+  --image examples/i2v_input.JPG \
+  --prompt "High quality video with smooth motion" \
+  --lora_path ./loras/style.safetensors --lora_scale 0.8 \
+  --lora_path ./loras/motion.safetensors --lora_scale 1.0 \
+  --lora_path ./loras/quality.safetensors --lora_scale 0.5 \
+  --lora_verbose \
+  --offload_model True
+```
+
+##### Expert-Specific LoRAs (Recommended for Best Results)
+
+Apply different LoRAs to high-noise expert (composition, timesteps 900-1000) and low-noise expert (details, timesteps 0-900):
+
+```sh
+python generate.py --task i2v-A14B --size 1280*720 --ckpt_dir ./Wan2.2-I2V-A14B \
+  --image examples/i2v_input.JPG \
+  --prompt "Professional cinematography with detailed textures" \
+  --high_noise_lora_path ./loras/composition.safetensors --high_noise_lora_scale 1.0 \
+  --low_noise_lora_path ./loras/detail.safetensors --low_noise_lora_scale 1.0 \
+  --lora_verbose \
+  --offload_model True
+```
+
+**LoRA Parameters:**
+- `--lora_path`: Path to LoRA .safetensors file (can be specified multiple times)
+- `--lora_scale`: Scaling factor for LoRA strength, typically 0.0-1.5 (default: 1.0)
+- `--high_noise_lora_path`: LoRA for high-noise expert only (composition/layout)
+- `--low_noise_lora_path`: LoRA for low-noise expert only (details/refinement)
+- `--lora_verbose`: Enable detailed LoRA loading logs
+
+**Pre-trained LoRAs:**
+- [LightX2V Distilled LoRAs](https://huggingface.co/lightx2v/Wan2.2-Distill-Loras) - 4-step fast inference
+- Training your own: See [DiffSynth-Studio](https://github.com/modelscope/DiffSynth-Studio/tree/main/examples/wanvideo/model_training)
+
 #### Run Text-Image-to-Video Generation
 
 This repository supports the `Wan2.2-TI2V-5B` Text-Image-to-Video model and can support video generation at 720P resolutions.

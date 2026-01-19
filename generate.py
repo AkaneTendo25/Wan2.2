@@ -222,6 +222,49 @@ def _parse_args():
         default=False,
         help="Whether to convert model paramerters dtype.")
 
+    # LoRA arguments
+    parser.add_argument(
+        "--lora_path",
+        type=str,
+        action="append",
+        default=None,
+        help="Path to LoRA .safetensors file to apply to both expert models. Can be specified multiple times.")
+    parser.add_argument(
+        "--lora_scale",
+        type=float,
+        action="append",
+        default=None,
+        help="Scale factor for each LoRA (default: 1.0). Can be specified multiple times.")
+    parser.add_argument(
+        "--high_noise_lora_path",
+        type=str,
+        action="append",
+        default=None,
+        help="Path to LoRA file for high noise expert only. Can be specified multiple times.")
+    parser.add_argument(
+        "--high_noise_lora_scale",
+        type=float,
+        action="append",
+        default=None,
+        help="Scale factor for high noise LoRA. Can be specified multiple times.")
+    parser.add_argument(
+        "--low_noise_lora_path",
+        type=str,
+        action="append",
+        default=None,
+        help="Path to LoRA file for low noise expert only. Can be specified multiple times.")
+    parser.add_argument(
+        "--low_noise_lora_scale",
+        type=float,
+        action="append",
+        default=None,
+        help="Scale factor for low noise LoRA. Can be specified multiple times.")
+    parser.add_argument(
+        "--lora_verbose",
+        action="store_true",
+        default=False,
+        help="Enable detailed LoRA loading logs.")
+
     # animate
     parser.add_argument(
         "--src_root_path",
@@ -525,6 +568,14 @@ def generate(args):
             use_sp=(args.ulysses_size > 1),
             t5_cpu=args.t5_cpu,
             convert_model_dtype=args.convert_model_dtype,
+            # LoRA parameters
+            lora_paths=args.lora_path,
+            lora_scales=args.lora_scale,
+            high_noise_lora_paths=args.high_noise_lora_path,
+            high_noise_lora_scales=args.high_noise_lora_scale,
+            low_noise_lora_paths=args.low_noise_lora_path,
+            low_noise_lora_scales=args.low_noise_lora_scale,
+            lora_verbose=args.lora_verbose,
         )
         logging.info("Generating video ...")
         video = wan_i2v.generate(
