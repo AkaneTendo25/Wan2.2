@@ -29,6 +29,13 @@ from .utils.fm_solvers import (
 )
 from .utils.fm_solvers_unipc import FlowUniPCMultistepScheduler
 
+# LoRA support
+try:
+    from .lora_utils import load_and_apply_lora
+    LORA_AVAILABLE = True
+except ImportError:
+    LORA_AVAILABLE = False
+
 
 class WanI2V:
 
@@ -44,6 +51,14 @@ class WanI2V:
         t5_cpu=False,
         init_on_cpu=True,
         convert_model_dtype=False,
+        # LoRA parameters
+        lora_paths=None,
+        lora_scales=None,
+        high_noise_lora_paths=None,
+        high_noise_lora_scales=None,
+        low_noise_lora_paths=None,
+        low_noise_lora_scales=None,
+        lora_verbose=False,
     ):
         r"""
         Initializes the image-to-video generation model components.
@@ -70,6 +85,23 @@ class WanI2V:
             convert_model_dtype (`bool`, *optional*, defaults to False):
                 Convert DiT model parameters dtype to 'config.param_dtype'.
                 Only works without FSDP.
+            lora_paths (`list[str]`, *optional*, defaults to None):
+                List of paths to LoRA .safetensors files to apply to both high and low noise models.
+                If specified, high_noise_lora_paths and low_noise_lora_paths will be ignored.
+            lora_scales (`list[float]`, *optional*, defaults to None):
+                Scaling factors for each LoRA in lora_paths. Defaults to 1.0 for all.
+            high_noise_lora_paths (`list[str]`, *optional*, defaults to None):
+                List of paths to LoRA files to apply only to high noise model.
+                Only used if lora_paths is not specified.
+            high_noise_lora_scales (`list[float]`, *optional*, defaults to None):
+                Scaling factors for high noise LoRAs.
+            low_noise_lora_paths (`list[str]`, *optional*, defaults to None):
+                List of paths to LoRA files to apply only to low noise model.
+                Only used if lora_paths is not specified.
+            low_noise_lora_scales (`list[float]`, *optional*, defaults to None):
+                Scaling factors for low noise LoRAs.
+            lora_verbose (`bool`, *optional*, defaults to False):
+                Enable detailed logging for LoRA loading and application.
         """
         self.device = torch.device(f"cuda:{device_id}")
         self.config = config
@@ -101,6 +133,20 @@ class WanI2V:
             device=self.device)
 
         logging.info(f"Creating WanModel from {checkpoint_dir}")
+        # Determine LoRA paths for each model
+        if lora_paths:
+            # Apply same LoRAs to both models
+            low_lora_paths = lora_paths
+            low_lora_scales = lora_scales
+            high_lora_paths = lora_paths
+            high_lora_scales = lora_scales
+        else:
+            # Use separate LoRAs
+            low_lora_paths = low_noise_lora_paths
+            low_lora_scales = low_noise_lora_scales
+            high_lora_paths = high_noise_lora_paths
+            high_lora_scales = high_noise_lora_scales
+
         self.low_noise_model = WanModel.from_pretrained(
             checkpoint_dir, subfolder=config.low_noise_checkpoint)
         self.low_noise_model = self._configure_model(
@@ -108,7 +154,11 @@ class WanI2V:
             use_sp=use_sp,
             dit_fsdp=dit_fsdp,
             shard_fn=shard_fn,
-            convert_model_dtype=convert_model_dtype)
+            convert_model_dtype=convert_model_dtype,
+            lora_paths=low_lora_paths,
+            lora_scales=low_lora_scales,
+            lora_verbose=lora_verbose,
+            model_name="low_noise_model")
 
         self.high_noise_model = WanModel.from_pretrained(
             checkpoint_dir, subfolder=config.high_noise_checkpoint)
@@ -117,7 +167,11 @@ class WanI2V:
             use_sp=use_sp,
             dit_fsdp=dit_fsdp,
             shard_fn=shard_fn,
-            convert_model_dtype=convert_model_dtype)
+            convert_model_dtype=convert_model_dtype,
+            lora_paths=high_lora_paths,
+            lora_scales=high_lora_scales,
+            lora_verbose=lora_verbose,
+            model_name="high_noise_model")
         if use_sp:
             self.sp_size = get_world_size()
         else:
@@ -126,7 +180,8 @@ class WanI2V:
         self.sample_neg_prompt = config.sample_neg_prompt
 
     def _configure_model(self, model, use_sp, dit_fsdp, shard_fn,
-                         convert_model_dtype):
+                         convert_model_dtype, lora_paths=None, lora_scales=None,
+                         lora_verbose=False, model_name="model"):
         """
         Configures a model object. This includes setting evaluation modes,
         applying distributed parallel strategy, and handling device placement.
@@ -143,12 +198,43 @@ class WanI2V:
             convert_model_dtype (`bool`):
                 Convert DiT model parameters dtype to 'config.param_dtype'.
                 Only works without FSDP.
+            lora_paths (`list[str]`, *optional*):
+                List of LoRA file paths to apply to this model.
+            lora_scales (`list[float]`, *optional*):
+                Scaling factors for each LoRA.
+            lora_verbose (`bool`, *optional*, defaults to False):
+                Enable detailed LoRA logging.
+            model_name (`str`, *optional*, defaults to "model"):
+                Name of the model for logging purposes.
 
         Returns:
             torch.nn.Module:
                 The configured model.
         """
         model.eval().requires_grad_(False)
+
+        # Apply LoRA BEFORE sequence parallel, FSDP, or sharding
+        if lora_paths and LORA_AVAILABLE:
+            logger = logging.getLogger("lora")
+            if lora_verbose:
+                logger.setLevel(logging.DEBUG)
+            else:
+                logger.setLevel(logging.INFO)
+
+            logger.info(f"Applying LoRA to {model_name}: {', '.join(lora_paths)}")
+            load_and_apply_lora(
+                model=model,
+                lora_paths=lora_paths,
+                lora_scales=lora_scales,
+                normalize_names=True,
+                verbose=lora_verbose,
+                logger=logger,
+            )
+        elif lora_paths and not LORA_AVAILABLE:
+            logging.warning(
+                f"LoRA paths specified for {model_name} but LoRA utilities are not available. "
+                "Install safetensors: pip install safetensors"
+            )
 
         if use_sp:
             for block in model.blocks:
