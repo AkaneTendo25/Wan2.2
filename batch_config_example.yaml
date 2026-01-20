@@ -1,0 +1,144 @@
+# Example Batch Testing Configuration
+# Minimal setup for quick testing
+
+# ============================================================================
+# PATHS
+# ============================================================================
+paths:
+  checkpoint_dir: "./Wan2.2-I2V-A14B"
+  lora_root: "./.output"
+  lora_filename: "adapter_model.safetensors"
+  output_dir: "./batch_results"
+  state_file: "./batch_state.json"
+  log_file: "./batch_inference.log"
+
+# ============================================================================
+# LORA DISCOVERY
+# ============================================================================
+lora_discovery:
+  max_depth: 5
+  include_patterns:
+    - "*/*/adapter_model.safetensors"
+  exclude_patterns:
+    - "*/checkpoint-*"
+  filter_subdirs: null  # null = all subdirectories
+
+# ============================================================================
+# TEST INPUTS
+# ============================================================================
+test_inputs:
+  tests:
+    # Example I2V test
+    - name: "portrait_cinematic"
+      image: "./examples/i2v_input.JPG"
+      prompt: "Cinematic portrait with dramatic lighting and smooth camera motion"
+
+    # Example T2V test (no input image)
+    - name: "abstract_motion"
+      image: null
+      prompt: "Abstract flowing patterns with vibrant colors and smooth transitions"
+
+# ============================================================================
+# GENERATION PARAMETERS
+# ============================================================================
+generation:
+  # Resolution
+  resolution_strategy: "resize"  # or "fixed"
+  fixed_resolution: "1280*720"
+  max_width: 1280
+  max_height: 720
+
+  # Frames and quality
+  frames: 81
+  steps: 40
+  cfg_scale: 5.0
+  shift: 5.0
+  solver: "unipc"
+  negative_prompt: ""
+
+  # Seeds (1 for quick test, more for consistency check)
+  seeds: [42]
+
+# ============================================================================
+# LORA PARAMETERS
+# ============================================================================
+lora:
+  default_scale: 1.0
+  test_scales: null  # null = only default, or [0.5, 0.8, 1.0, 1.2]
+  apply_to: "both"
+  verbose: true
+
+# ============================================================================
+# MEMORY OPTIMIZATION
+# ============================================================================
+memory:
+  offload_model: true
+  convert_dtype: true
+  t5_cpu: false
+  clear_cache: true
+
+# ============================================================================
+# EXECUTION CONTROL
+# ============================================================================
+execution:
+  device_id: 0
+  skip_existing: true
+  resume: true
+  max_consecutive_errors: 5
+  retry_on_error: true
+  max_retries: 2
+  generation_timeout: 3600
+  dry_run: false
+
+# ============================================================================
+# OUTPUT ORGANIZATION
+# ============================================================================
+output:
+  structure: "preserve"  # preserve, hierarchical, by_lora, by_test, flat
+  filename_template: "video_s{seed}_scale{scale}.mp4"
+  save_metadata: true
+  metadata_fields:
+    - lora_path
+    - lora_scale
+    - image_path
+    - prompt
+    - seed
+    - resolution
+    - frames
+    - steps
+    - cfg_scale
+    - generation_time
+    - gpu_memory_used
+
+# ============================================================================
+# LOGGING
+# ============================================================================
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(levelname)s - %(message)s"
+  console: true
+  show_progress: true
+
+# ============================================================================
+# NOTIFICATIONS
+# ============================================================================
+notifications:
+  enabled: false
+  method: "webhook"
+  webhook_url: null
+  on_start: true
+  on_complete: true
+  on_error: true
+  on_milestone: true
+  milestone_interval: 10
+
+# ============================================================================
+# ADVANCED
+# ============================================================================
+advanced:
+  parallel: false
+  num_workers: 1
+  preload_model: true
+  checkpoint_interval: 10
+  include_baseline: true
+  baseline_output_dir: "baseline"

@@ -1,0 +1,255 @@
+# Batch LoRA Testing Configuration
+# This config defines all parameters for automated LoRA testing
+
+# ============================================================================
+# PATHS
+# ============================================================================
+paths:
+  # Checkpoint directory
+  checkpoint_dir: "./Wan2.2-I2V-A14B"
+
+  # Root directory containing LoRA subfolders
+  # Structure: lora_root/subfolder1/subfolder2/adapter_model.safetensors
+  lora_root: "./.output"
+
+  # LoRA filename to look for in leaf directories
+  lora_filename: "adapter_model.safetensors"
+
+  # Output directory for generated videos
+  output_dir: "./batch_results"
+
+  # State file to track progress (for resume)
+  state_file: "./batch_state.json"
+
+  # Log file
+  log_file: "./batch_inference.log"
+
+# ============================================================================
+# LORA DISCOVERY
+# ============================================================================
+lora_discovery:
+  # Maximum depth to search for LoRA files
+  max_depth: 5
+
+  # Include patterns (glob style)
+  include_patterns:
+    - "*/*/adapter_model.safetensors"
+    - "*/*/*/adapter_model.safetensors"
+
+  # Exclude patterns (skip these directories)
+  exclude_patterns:
+    - "*/checkpoint-*"
+    - "*/.git/*"
+    - "*/temp/*"
+
+  # Filter by specific subdirectories (null = all)
+  # Example: ["experiment1", "experiment2"]
+  filter_subdirs: null
+
+# ============================================================================
+# TEST INPUTS
+# ============================================================================
+test_inputs:
+  # List of test configurations
+  # Each entry can have image (I2V) or just prompt (T2V)
+  tests:
+    - name: "cat_cinematic"
+      image: "./examples/i2v_input.JPG"  # Set to null for T2V
+      prompt: "A cinematic video with smooth camera motion and dramatic lighting"
+
+    - name: "portrait_professional"
+      image: "./test_images/portrait.jpg"
+      prompt: "High quality video with professional color grading and composition"
+
+    - name: "t2v_abstract"
+      image: null  # T2V mode - no input image
+      prompt: "Abstract flowing patterns with vibrant colors and smooth transitions"
+
+    # Add more test configurations as needed
+
+# ============================================================================
+# GENERATION PARAMETERS
+# ============================================================================
+generation:
+  # Resolution strategy:
+  # - "fixed": Use fixed resolution (ignores input image aspect ratio)
+  # - "resize": Resize to fit within max dimensions while preserving aspect ratio
+  resolution_strategy: "resize"  # Options: "fixed", "resize"
+
+  # Fixed resolution (used when strategy is "fixed")
+  fixed_resolution: "1280*720"  # Options: "480*832", "720*1280", "1280*720"
+
+  # Max dimensions (used when strategy is "resize")
+  # Output will fit within these bounds while preserving aspect ratio
+  max_width: 1280
+  max_height: 720
+
+  # Number of frames (must be 4n+1)
+  frames: 81
+
+  # Sampling steps
+  steps: 40
+
+  # CFG scale
+  cfg_scale: 5.0
+
+  # Shift parameter (5.0 for 720p, 3.0 for 480p)
+  shift: 5.0
+
+  # Solver
+  solver: "unipc"  # Options: "unipc", "dpm++"
+
+  # Seeds to test (list of integers, or "random" for random seed)
+  # Multiple seeds allow testing consistency
+  seeds: [42, 123, 456]
+
+  # Negative prompt (empty string for none)
+  negative_prompt: ""
+
+# ============================================================================
+# LORA PARAMETERS
+# ============================================================================
+lora:
+  # Default LoRA scale
+  default_scale: 1.0
+
+  # Test multiple scales for each LoRA
+  # Set to null to only use default_scale
+  test_scales: null  # [0.5, 0.8, 1.0, 1.2]
+
+  # Apply LoRA to which expert models
+  # Options: "both", "high_noise_only", "low_noise_only"
+  apply_to: "both"
+
+  # Verbose LoRA loading logs
+  verbose: true
+
+# ============================================================================
+# MEMORY OPTIMIZATION
+# ============================================================================
+memory:
+  # Offload models to CPU between generations
+  offload_model: true
+
+  # Use FP16/BF16
+  convert_dtype: true
+
+  # Keep T5 on CPU
+  t5_cpu: false
+
+  # Clear CUDA cache between generations
+  clear_cache: true
+
+# ============================================================================
+# EXECUTION CONTROL
+# ============================================================================
+execution:
+  # GPU device ID
+  device_id: 0
+
+  # Skip if output already exists
+  skip_existing: true
+
+  # Continue from last checkpoint if interrupted
+  resume: true
+
+  # Maximum number of consecutive errors before stopping
+  max_consecutive_errors: 5
+
+  # Retry failed generations
+  retry_on_error: true
+  max_retries: 2
+
+  # Timeout per generation (seconds, null for no timeout)
+  generation_timeout: 3600  # 1 hour
+
+  # Dry run (discover LoRAs and plan tests without running)
+  dry_run: false
+
+# ============================================================================
+# OUTPUT ORGANIZATION
+# ============================================================================
+output:
+  # Output directory structure:
+  # - "flat": All videos in one directory
+  # - "by_lora": Organize by LoRA name
+  # - "by_test": Organize by test name
+  # - "hierarchical": lora_name/test_name/
+  # - "preserve": Preserve LoRA directory structure relative to lora_root
+  structure: "preserve"
+
+  # Video filename template
+  # Available variables: {lora_name}, {image_name}, {prompt_name}, {seed}, {scale}, {timestamp}
+  filename_template: "video_s{seed}_scale{scale}.mp4"
+
+  # Save metadata JSON alongside each video
+  save_metadata: true
+
+  # Metadata fields to include
+  metadata_fields:
+    - lora_path
+    - lora_scale
+    - image_path
+    - prompt
+    - seed
+    - resolution
+    - frames
+    - steps
+    - cfg_scale
+    - generation_time
+    - gpu_memory_used
+
+# ============================================================================
+# LOGGING
+# ============================================================================
+logging:
+  # Log level: DEBUG, INFO, WARNING, ERROR
+  level: "INFO"
+
+  # Log format
+  format: "%(asctime)s - %(levelname)s - %(message)s"
+
+  # Also print to console
+  console: true
+
+  # Progress bar
+  show_progress: true
+
+# ============================================================================
+# NOTIFICATIONS (Optional)
+# ============================================================================
+notifications:
+  # Enable notifications
+  enabled: false
+
+  # Notification method: "webhook", "email"
+  method: "webhook"
+
+  # Webhook URL (for Discord, Slack, etc.)
+  webhook_url: null
+
+  # Send notification on:
+  on_start: true
+  on_complete: true
+  on_error: true
+  on_milestone: true  # Every N completions
+  milestone_interval: 10
+
+# ============================================================================
+# ADVANCED
+# ============================================================================
+advanced:
+  # Parallel processing (experimental, may cause OOM)
+  parallel: false
+  num_workers: 1
+
+  # Preload model once (faster but uses more memory)
+  preload_model: true
+
+  # Save checkpoints every N generations
+  checkpoint_interval: 10
+
+  # Generate baseline outputs (no LoRA) before running LoRA tests
+  # Useful for A/B comparison
+  include_baseline: true
+  baseline_output_dir: "baseline"  # Subdirectory within output_dir
