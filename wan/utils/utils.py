@@ -89,7 +89,7 @@ def merge_video_audio(video_path: str, audio_path: str):
 
 def save_video(tensor,
                save_file=None,
-               fps=30,
+               fps=16,
                suffix='.mp4',
                nrow=8,
                normalize=True,
