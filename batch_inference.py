@@ -436,7 +436,7 @@ class BatchExecutor:
             # Load image if I2V mode
             img = None
             if not test_case.is_t2v:
-                img = Image.open(test_case.image_path)
+                img = Image.open(test_case.image_path).convert('RGB')
                 logging.info(f"Loaded image: {test_case.image_path}")
 
             # Calculate resolution
