@@ -180,7 +180,7 @@ output:
 
   # Video filename template
   # Available variables: {lora_name}, {image_name}, {prompt_name}, {seed}, {scale}, {timestamp}
-  filename_template: "video_s{seed}_scale{scale}.mp4"
+  filename_template: "{test_name}_s{seed}_scale{scale}.mp4"
 
   # Save metadata JSON alongside each video
   save_metadata: true
