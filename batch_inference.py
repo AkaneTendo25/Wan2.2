@@ -483,7 +483,7 @@ class BatchExecutor:
             save_video(
                 tensor=video[None],
                 save_file=test_case.output_path,
-                fps=24,
+                fps=16,
                 nrow=1,
                 normalize=True,
                 value_range=(-1, 1)
